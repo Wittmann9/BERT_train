@@ -10,17 +10,17 @@ Original file is located at
 from torch.utils.data.dataloader import DataLoader
 import nltk
 import pandas as pd
-import string
+# import string
 import torch 
 from torch.utils.data import Dataset, DataLoader
-from torchvision import datasets
+# from torchvision import datasets
 
-!pip install transformers datasets
+# !pip install transformers datasets
 
 from transformers import AutoTokenizer, AutoModel
 
-from google.colab import drive
-drive.mount('/content/drive')
+# from google.colab import drive
+# drive.mount('/content/drive')
 
 dataset = pd.read_csv('/content/ArSarcasm_train.csv')
 dataset.head()
@@ -165,10 +165,10 @@ scores
 
 # from arabert.preprocess import ArabertPreprocessor, never_split_tokens
 
-model_name="aubmindlab/bert-base-arabertv02"
+# model_name="aubmindlab/bert-base-arabertv02"
 # arabert_prep = ArabertPreprocessor(model_name=model_name)
-model  = AutoModel.from_pretrained(model_name)
-
-text = "ولن نبالغ إذا قلنا إن هاتف أو كمبيوتر المكتب في زمننا هذا ضروري"
-model(text)
+# model  = AutoModel.from_pretrained(model_name)
+#
+# text = "ولن نبالغ إذا قلنا إن هاتف أو كمبيوتر المكتب في زمننا هذا ضروري"
+# model(text)
 
