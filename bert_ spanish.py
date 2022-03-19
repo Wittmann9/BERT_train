@@ -42,7 +42,6 @@ class CustomDataset(Dataset):
   def __init__(self, data):
     self.data = data
     self.data['labels']  = data['sarcasm'].apply(lambda x :int(x))
-    self.data = self.data[self.data['sarcasm']==1]
 
   def __len__(self):
     return len(self.data)
