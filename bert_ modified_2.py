@@ -18,11 +18,12 @@ from torch.utils.data import Dataset, DataLoader
 from torch.nn.modules.activation import Softmax
 from transformers import AutoModelForSequenceClassification
 from torch.optim import AdamW
-from transformers import get_scheduler
+from transformers import get_scheduler, BertForSequenceClassification
 from transformers import TrainingArguments
 from torch.utils.tensorboard import SummaryWriter
 import datasets
 import os
+
 
 accuracy_metric = datasets.load_metric("accuracy")
 f1_metric = datasets.load_metric("f1")
@@ -31,7 +32,7 @@ accuracy_for_class_0 = datasets.load_metric("accuracy")
 accuracy_for_class_1 = datasets.load_metric("accuracy")
 
 
-torch.manual_seed(69)
+torch.manual_seed(3)
 
 from transformers import AutoTokenizer, AutoModel,  TrainingArguments, Trainer
 
@@ -42,7 +43,7 @@ class CustomDataset(Dataset):
   def __init__(self, data):
     self.data = data
     self.data['labels']  = data['sarcasm'].apply(lambda x :int(x))
-    self.data = self.data[self.data['sarcasm']==1]
+    # self.data = self.data[self.data['sarcasm']==1]
 
   def __len__(self):
     return len(self.data)
@@ -76,40 +77,40 @@ import torch.nn as nn
 
 
 
-class BertMeanClassifier(nn.Module):
-    def __init__(self, transformer_name = 'distilbert-base-uncased', 
-                 n_classes =2, num_hids_mean= 4):
-        super().__init__()
-        self.transformer = AutoModel.from_pretrained(transformer_name, 
-                                                      output_hidden_states = True)
-        self.scorer = nn.Sequential(
-            nn.Linear(768, n_classes),
-            nn.Softmax(dim=-1) 
-        )
-        self.num_hids_mean = num_hids_mean
-
-    def _mean_hidden_states(self, output):
-      # print(len(output))
-      last_n_hinned = output[-self.num_hids_mean:]
-      # print(len(last_n_hinned))
-      cls_represent = [x[:,0,:] for x in last_n_hinned]
-      # print(len(cls_represent))
-      cls_representation = torch.stack(cls_represent, dim = 1)
-      # print(cls_representation.shape)
-      cls_means = torch.mean(cls_representation, dim = 1)
-      # print(cls_means.shape)
-      return cls_means
-
-    def forward(self, tokenized_inputs):
-        trans_output = self.transformer(**tokenized_inputs).hidden_states
-        mean_hiddens = self._mean_hidden_states(trans_output)
-        scores = self.scorer(mean_hiddens)
-        return scores
+# class BertMeanClassifier(nn.Module):
+#     def __init__(self, transformer_name = 'distilbert-base-uncased',
+#                  n_classes =2, num_hids_mean= 2):
+#         super().__init__()
+#         self.transformer = AutoModel.from_pretrained(transformer_name,
+#                                                       output_hidden_states = True)
+#         self.scorer = nn.Sequential(
+#             nn.Linear(768, n_classes),
+#             nn.Softmax(dim=-1)
+#         )
+#         self.num_hids_mean = num_hids_mean
+#
+#     def _mean_hidden_states(self, output):
+#       # print(len(output))
+#       last_n_hinned = output[-self.num_hids_mean:]
+#       # print(len(last_n_hinned))
+#       cls_represent = [x[:,0,:] for x in last_n_hinned]
+#       # print(len(cls_represent))
+#       cls_representation = torch.stack(cls_represent, dim = 1)
+#       # print(cls_representation.shape)
+#       cls_means = torch.mean(cls_representation, dim = 1)
+#       # print(cls_means.shape)
+#       return cls_means
+#
+#     def forward(self, tokenized_inputs):
+#         trans_output = self.transformer(**tokenized_inputs).hidden_states
+#         mean_hiddens = self._mean_hidden_states(trans_output)
+#         scores = self.scorer(mean_hiddens)
+#         return scores
 
 
 
 if __name__ == '__main__':
-    save_dir = 'arab_bert_baseline'
+    save_dir = 'arab_bert_with_logits'
 
     tokenizer = AutoTokenizer.from_pretrained('aubmindlab/bert-base-arabertv02-twitter')
 
@@ -117,7 +118,8 @@ if __name__ == '__main__':
     test_dataset = pd.read_csv('datasets/sarcasm_test.csv')
 
     train_data = CustomDataset(train_dataset)
-    test_data = CustomDataset(test_dataset)
+    # test_data = CustomDataset(test_dataset)
+    test_data = train_data
 
 
     train_dataloader = LoadingData(
@@ -136,13 +138,15 @@ if __name__ == '__main__':
 
     args_dict = {
         'transformer_name' : 'aubmindlab/bert-base-arabertv02-twitter',
-        'num_hids_mean': 4,
+        'num_hids_mean': 2,
         'n_classes': 2
     }
     # LR = 5e-10
     LR = 5e-3
 
-    model = BertMeanClassifier(**args_dict)
+    # model = BertMeanClassifier(**args_dict)
+
+    model = BertForSequenceClassification.from_pretrained(args_dict['transformer_name'])
     optimizer = AdamW(model.parameters(), lr=LR)
     criterion = torch.nn.CrossEntropyLoss()
 
@@ -166,7 +170,7 @@ if __name__ == '__main__':
         for tokenized_text, labels in test_dataloader:
             tokenized_text = {k: v.to(device) for k, v in tokenized_text.items()}
             with torch.no_grad():
-                logits = model(tokenized_text)
+                logits = model(**tokenized_text).logits
 
             predictions = torch.argmax(logits, dim=-1)
             idx_0 = labels == 0
@@ -208,7 +212,7 @@ if __name__ == '__main__':
         model.train()
         for tokenized_text, labels in train_dataloader:
             tokenized_text = {k: v.to(device) for k, v in tokenized_text.items()}
-            outputs = model(tokenized_text)
+            outputs = model(**tokenized_text).logits
             loss = criterion(outputs, labels)
             writer.add_scalar('Loss/train', loss.item(), i)
             loss.backward()
