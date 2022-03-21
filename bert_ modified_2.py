@@ -41,7 +41,7 @@ import json
 
 class CustomDataset(Dataset):
   def __init__(self, data):
-    self.data = data
+    self.data = data.iloc[:20]
     self.data['labels']  = data['sarcasm'].apply(lambda x :int(x))
     # self.data = self.data[self.data['sarcasm']==1]
 
@@ -118,8 +118,8 @@ if __name__ == '__main__':
     test_dataset = pd.read_csv('datasets/sarcasm_test.csv')
 
     train_data = CustomDataset(train_dataset)
-    # test_data = CustomDataset(test_dataset)
-    test_data = train_data
+    test_data = CustomDataset(test_dataset)
+    # test_data = train_data
 
 
     train_dataloader = LoadingData(
@@ -145,10 +145,15 @@ if __name__ == '__main__':
     LR = 5e-3
 
     # model = BertMeanClassifier(**args_dict)
+    n_0 = len(train_dataset[train_dataset['sarcasm'] == 0])
+    n_1 = len(train_dataset[train_dataset['sarcasm'] == 1])
+    w_0 = (n_0 + n_1) / (2.0 * n_0)
+    w_1 = (n_0 + n_1) / (2.0 * n_1)
 
     model = BertForSequenceClassification.from_pretrained(args_dict['transformer_name'])
     optimizer = AdamW(model.parameters(), lr=LR)
-    criterion = torch.nn.CrossEntropyLoss()
+    criterion = torch.nn.CrossEntropyLoss(weight=torch.Tensor([w_0, w_1]))
+    print('Weights: ', w_0, w_1)
 
     num_epochs = 3
     num_training_steps = num_epochs * len(train_dataloader)
