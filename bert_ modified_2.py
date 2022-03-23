@@ -40,9 +40,29 @@ from transformers import AutoTokenizer, AutoModel,  TrainingArguments, Trainer
 import json
 
 class CustomDataset(Dataset):
-  def __init__(self, data):
-    self.data = data.iloc[:20]
-    self.data['labels']  = data['sarcasm'].apply(lambda x :int(x))
+  def __init__(self, data, clip_zero_class = False):
+    self.data = data
+    self.data['labels'] = data['sarcasm'].apply(lambda x :int(x))
+
+    if clip_zero_class:
+        # find all indexes of 1 class
+        indexes_class_1 = self.data[self.data['labels'] == 1].index.values
+
+        # caluclate number of elements of 1 class
+        len_indexes_class_1 = len(indexes_class_1)
+
+        # randomly select elements of class 0 in required number
+        indexes_class_0 = self.data[self.data['labels'] == 0].index.values
+        class_zero_random_selection = np.random.choice(indexes_class_0, len_indexes_class_1, replace = False)
+        # merge indexes
+        merged = np.concatenate((indexes_class_0, indexes_class_1))
+
+        # select elments by the indexes
+        self.data = self.data[self.data.index.isin(merged)]
+
+    self.data = self.data.reset_index()
+
+
     # self.data = self.data[self.data['sarcasm']==1]
 
   def __len__(self):
@@ -110,14 +130,14 @@ import torch.nn as nn
 
 
 if __name__ == '__main__':
-    save_dir = 'arab_bert_with_logits'
+    save_dir = 'arab_bert_with_logits_bs32'
 
     tokenizer = AutoTokenizer.from_pretrained('aubmindlab/bert-base-arabertv02-twitter')
 
     train_dataset = pd.read_csv('datasets/ArSarcasm_train.csv')
     test_dataset = pd.read_csv('datasets/sarcasm_test.csv')
 
-    train_data = CustomDataset(train_dataset)
+    train_data = CustomDataset(train_dataset, clip_zero_class=True)
     test_data = CustomDataset(test_dataset)
     # test_data = train_data
 
@@ -126,14 +146,14 @@ if __name__ == '__main__':
          tokenizer = tokenizer,
          data = train_data,
          num_workers=1,
-         batch_size=4
+         batch_size=32
     ).dataloader
 
     test_dataloader = LoadingData(
          tokenizer = tokenizer,
          data = test_data,
          num_workers=1,
-         batch_size=4
+         batch_size=64
     ).dataloader
 
     args_dict = {
@@ -235,20 +255,4 @@ if __name__ == '__main__':
         eval_metrics = testing_metrics(test_dataloader, model)
         for k, v in eval_metrics.items():
             writer.add_scalar(f'test/{k}', v, epoch)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
