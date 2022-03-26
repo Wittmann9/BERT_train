@@ -55,7 +55,7 @@ class CustomDataset(Dataset):
         indexes_class_0 = self.data[self.data['labels'] == 0].index.values
         class_zero_random_selection = np.random.choice(indexes_class_0, len_indexes_class_1, replace = False)
         # merge indexes
-        merged = np.concatenate((indexes_class_0, indexes_class_1))
+        merged = np.concatenate((class_zero_random_selection, indexes_class_1))
 
         # select elments by the indexes
         self.data = self.data[self.data.index.isin(merged)]
@@ -130,7 +130,8 @@ import torch.nn as nn
 
 
 if __name__ == '__main__':
-    save_dir = 'arab_bert_with_logits_bs32'
+    BS = 4
+    save_dir = f'arab_bert_with_logits_bs{str(BS)}'
 
     tokenizer = AutoTokenizer.from_pretrained('aubmindlab/bert-base-arabertv02-twitter')
 
@@ -146,7 +147,7 @@ if __name__ == '__main__':
          tokenizer = tokenizer,
          data = train_data,
          num_workers=1,
-         batch_size=32
+         batch_size=BS
     ).dataloader
 
     test_dataloader = LoadingData(
@@ -172,8 +173,9 @@ if __name__ == '__main__':
 
     model = BertForSequenceClassification.from_pretrained(args_dict['transformer_name'])
     optimizer = AdamW(model.parameters(), lr=LR)
-    criterion = torch.nn.CrossEntropyLoss(weight=torch.Tensor([w_0, w_1]))
-    print('Weights: ', w_0, w_1)
+    # criterion = torch.nn.CrossEntropyLoss(weight=torch.Tensor([w_0, w_1]))
+    criterion = torch.nn.CrossEntropyLoss()
+    # print('Weights: ', w_0, w_1)
 
     num_epochs = 3
     num_training_steps = num_epochs * len(train_dataloader)
